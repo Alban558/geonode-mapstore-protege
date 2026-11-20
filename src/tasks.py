@@ -218,6 +218,7 @@ def updateadmin(ctx):
     _prepare_admin_fixture(
         os.environ.get("ADMIN_PASSWORD", "admin"),
         os.environ.get("ADMIN_EMAIL", "admin@example.org"),
+        os.environ.get("ADMIN_USERNAME", "admin"),
     )
     ctx.run(
         f"source $HOME/.override_env && "
@@ -349,7 +350,7 @@ def _prepare_site_fixture():
         json.dump(default_fixture, fixturefile)
 
 
-def _prepare_admin_fixture(admin_password, admin_email):
+def _prepare_admin_fixture(admin_password, admin_email, admin_username):
     from django.contrib.auth.hashers import make_password
 
     d = datetime.datetime.now()
@@ -368,7 +369,7 @@ def _prepare_admin_fixture(admin_password, admin_email):
                 "last_name": "",
                 "password": make_password(admin_password),
                 "user_permissions": [],
-                "username": "admin",
+                "username": admin_username,
             },
             "model": "people.Profile",
             "pk": 1000,
