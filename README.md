@@ -61,6 +61,14 @@ Si le fichier a été créé avant l’ajout de ces paramètres, les ajouter dep
 Ne jamais publier `.env`, les mots de passe ou les données SIG. `.env.sample`
 ne contient que des valeurs de modèle.
 
+Le compte administrateur GeoNode est configuré par `ADMIN_USERNAME` (par
+défaut `admin`), `ADMIN_PASSWORD` et `ADMIN_EMAIL`. Le script
+`create-envfile.py` ne propose pas d’option pour le nom d’utilisateur : si vous
+souhaitez un autre nom, modifiez `ADMIN_USERNAME` dans `.env` avant le premier
+démarrage. Pour réappliquer ces paramètres à une instance déjà initialisée,
+`FORCE_REINIT=true` relance les fixtures GeoNode; sauvegardez les données avant
+de le faire.
+
 Sur une installation GeoServer vierge, les identifiants d’amorçage sont
 `admin` / `geoserver`; l’initialiseur crée ensuite le compte administrateur
 configuré dans `.env`. Pour une installation avec des données GeoServer déjà
