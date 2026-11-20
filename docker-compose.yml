@@ -121,10 +121,71 @@ services:
       - backup-restore:/backup_restore
       - data:/data
       - tmp:/tmp
+      - type: bind
+        source: ${SIG_DATA_PATH:-D:/SIG_DATA}
+        target: /SIG_DATA
     restart: unless-stopped
     depends_on:
       django:
         condition: service_healthy
+
+  # Creates the configured GeoServer administrator on a fresh data volume.
+  geoserver-init:
+    image: ${COMPOSE_PROJECT_NAME}/geoserver:${GEOSERVER_BASE_IMAGE_VERSION}
+    container_name: geoserver-init4${COMPOSE_PROJECT_NAME}
+    entrypoint: ["/usr/local/tomcat/tmp/bootstrap-admin.sh"]
+    env_file:
+      - .env
+    environment:
+      - GEOSERVER_BOOTSTRAP_USER=${GEOSERVER_BOOTSTRAP_USER:-admin}
+      - GEOSERVER_BOOTSTRAP_PASSWORD=${GEOSERVER_BOOTSTRAP_PASSWORD:-geoserver}
+    restart: "no"
+    depends_on:
+      geoserver:
+        condition: service_healthy
+
+  # Standalone MapStore application, separate from GeoNode's integrated client.
+  mapstore:
+    image: ${MAPSTORE_IMAGE:-geosolutionsit/mapstore2:v2026.03.00-stable}
+    container_name: mapstore4${COMPOSE_PROJECT_NAME}
+    environment:
+      INITIAL_ADMIN_PASSWORD: ${MAPSTORE_INITIAL_ADMIN_PASSWORD:-}
+    volumes:
+      - mapstore-data:/usr/local/tomcat/datadir
+    restart: unless-stopped
+
+  # Same-origin gateway for MapStore and GeoServer WMS requests.
+  mapstore-gateway:
+    image: ${COMPOSE_PROJECT_NAME}/mapstore-gateway:1.31.8-alpine
+    build:
+      context: ./docker/mapstore-gateway
+      dockerfile: Dockerfile
+    container_name: mapstore-gateway4${COMPOSE_PROJECT_NAME}
+    env_file:
+      - .env
+    ports:
+      - "${MAPSTORE_PORT:-8081}:80"
+    volumes:
+      - ./docker/mapstore-gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      mapstore:
+        condition: service_started
+      mapstore-reader-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Creates/verifies a dedicated, non-admin GeoServer account for standalone MapStore.
+  mapstore-reader-init:
+    image: ${COMPOSE_PROJECT_NAME}/geoserver:${GEOSERVER_BASE_IMAGE_VERSION}
+    entrypoint: ["/bin/bash", "/usr/local/tomcat/tmp/bootstrap-mapstore-reader.sh"]
+    env_file:
+      - .env
+    volumes:
+      - ./docker/geoserver/bootstrap-mapstore-reader.sh:/usr/local/tomcat/tmp/bootstrap-mapstore-reader.sh:ro
+    depends_on:
+      geoserver:
+        condition: service_healthy
+    restart: "no"
 
   # PostGIS database.
   db:
@@ -187,3 +248,5 @@ volumes:
     name: ${COMPOSE_PROJECT_NAME}-tmp
   redisdata:
     name: ${COMPOSE_PROJECT_NAME}-redisdata
+  mapstore-data:
+    name: ${COMPOSE_PROJECT_NAME}-mapstore-data

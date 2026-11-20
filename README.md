@@ -8,6 +8,7 @@ This repository has been converted from a Django project template into a concret
 ## Table of Contents
 
 -  [Quick Docker Start](#quick-docker-start)
+-  [Reproduire la configuration sur une nouvelle machine](#reproduire-la-configuration-sur-une-nouvelle-machine)
 -  [Start your server using Docker](#start-your-server-using-docker)
 -  [Run the instance in development mode](#run-the-instance-in-development-mode)
 -  [Run the instance on a public site](#run-the-instance-on-a-public-site)
@@ -15,6 +16,119 @@ This repository has been converted from a Django project template into a concret
 -  [Backup and Restore from Docker Images](#backup-and-restore-the-docker-images)
 -  [Recommended: Track your changes](#recommended-track-your-changes)
 -  [Hints: Configuring `requirements.txt`](#hints-configuring-requirementstxt)
+
+## Reproduire la configuration sur une nouvelle machine
+
+Ce guide décrit le déploiement GeoNode avec GeoServer et un MapStore autonome,
+séparé de la carte intégrée à GeoNode. Les commandes supposent Docker Compose
+v2 et Docker Desktop sous Windows; adaptez les chemins et adresses si besoin.
+
+### 1. Préparer la machine et le dépôt
+
+Installer Git, Docker Desktop et Python, puis cloner le dépôt :
+
+```powershell
+git clone https://github.com/Alban558/geonode-mapstore-protege.git
+cd geonode-mapstore-protege
+```
+
+Le premier démarrage construit et lance les services; prévoir suffisamment de
+mémoire pour les conteneurs GeoServer et GeoNode.
+
+### 2. Copier les données SIG et configurer leur chemin
+
+Copier les fichiers SIG nécessaires sur la nouvelle machine. Dans `.env`,
+configurer `SIG_DATA_PATH` pour désigner le dossier hôte qui les contient.
+L’exemple fourni pointe vers `D:/SIG_DATA`; ce chemin n’est pas transféré par
+Git. Compose monte ce dossier en lecture/écriture dans GeoServer sous
+`/SIG_DATA`.
+
+Le montage des fichiers ne publie pas automatiquement une couche. La couche
+testée ici doit être importée et publiée dans GeoNode sous le nom
+`geonode:COMMUNE-1` avant que l’initialiseur puisse vérifier son accès.
+
+### 3. Créer la configuration locale
+
+Créer `.env` à partir du modèle, avec des mots de passe générés localement :
+
+```powershell
+python create-envfile.py --hostname localhost --env_type dev --email admin@example.com
+```
+
+Vérifier que `.env` contient les paramètres `MAPSTORE_*` et `SIG_DATA_PATH`.
+Si le fichier a été créé avant l’ajout de ces paramètres, les ajouter depuis
+`.env.sample` et remplacer le chemin par celui de la nouvelle machine.
+Ne jamais publier `.env`, les mots de passe ou les données SIG. `.env.sample`
+ne contient que des valeurs de modèle.
+
+Sur une installation GeoServer vierge, les identifiants d’amorçage sont
+`admin` / `geoserver`; l’initialiseur crée ensuite le compte administrateur
+configuré dans `.env`. Pour une installation avec des données GeoServer déjà
+initialisées, les identifiants d’amorçage doivent correspondre à ceux de ces
+données.
+
+### 4. Démarrer GeoNode, GeoServer et MapStore
+
+Depuis la racine du dépôt :
+
+```powershell
+docker compose up -d --build
+```
+
+GeoNode est disponible sur `http://localhost/`. MapStore autonome est
+disponible sur `http://localhost:8081/mapstore/`. Connectez-vous à MapStore
+avec l’utilisateur `admin` et le mot de passe
+`MAPSTORE_INITIAL_ADMIN_PASSWORD` du fichier `.env`.
+Après la première connexion, changez le mot de passe administrateur MapStore et
+retirez `MAPSTORE_INITIAL_ADMIN_PASSWORD` de `.env`.
+
+Si `geonode:COMMUNE-1` n’était pas encore publiée au premier démarrage,
+publiez-la dans GeoNode, puis relancez l’initialiseur :
+
+```powershell
+docker compose up -d --force-recreate mapstore-reader-init
+```
+
+Le rôle `MAPSTORE_READ` et le compte lecteur GeoServer sont créés par
+l’initialiseur. Les règles GeoFence maintiennent la couche inaccessible aux
+requêtes anonymes.
+
+### 5. Ajouter le catalogue WMS à MapStore
+
+Dans le catalogue de MapStore, ajouter un service WMS avec l’adresse :
+
+```text
+http://localhost:8081/geoserver/wms
+```
+
+Le gateway GeoServer exige une authentification HTTP Basic. Utiliser
+`MAPSTORE_GEOSERVER_READER_USER` et
+`MAPSTORE_GEOSERVER_READER_PASSWORD` de `.env`; ces identifiants sont distincts
+de ceux de MapStore et de GeoNode. Le comportement du dialogue d’authentification
+dans l’interface MapStore reste à confirmer.
+
+Les tests HTTP confirment que les requêtes WMS anonymes sont refusées et que le
+compte lecteur peut obtenir les capacités et une image `GetMap`. La validation
+visuelle de l’ajout du catalogue et du rendu dans l’interface MapStore reste à
+effectuer.
+
+### 6. Vérifier et conserver l’installation
+
+Vérifier l’état des conteneurs et le résultat de l’initialiseur :
+
+```powershell
+docker compose ps
+docker compose logs mapstore-reader-init
+```
+
+Les appels WMS anonymes doivent être refusés; le compte lecteur doit voir
+`geonode:COMMUNE-1` et obtenir une image pour `GetMap`. Les données GeoNode,
+GeoServer et MapStore sont également conservées dans des volumes Docker :
+cloner le dépôt ne copie pas ces volumes. Pour retrouver les données publiées
+sur une autre machine, il faut les réimporter ou migrer les volumes concernés.
+
+L’authentification Basic sur HTTP n’est pas chiffrée. L’accès sur `localhost`
+convient au test local; ne publiez pas le port `8081` sur Internet sans HTTPS.
 
 ## Quick Docker Start
 To setup your project follow these instructions:
@@ -38,6 +152,8 @@ To setup your project follow these instructions:
     - *env_type*: `prod`, `test` or `dev`. It will set the `DEBUG` variable to `False` (`prod`, `test`) or `True` (`dev`)
     - *geonodepwd*: GeoNode admin password (required inside the .env)
     - *geoserverpwd*: Geoserver admin password (required inside the .env)
+    - *mapstorepwd*: Standalone MapStore admin password (required inside the .env)
+    - *mapstoregeoserverpwd*: Standalone MapStore GeoServer reader password (required inside the .env)
     - *pgpwd*: PostgreSQL password (required inside the .env)
     - *dbpwd*: GeoNode DB user password (required inside the .env)
     - *geodbpwd*: Geodatabase user password (required inside the .env)
@@ -61,6 +177,8 @@ To setup your project follow these instructions:
         --email random@email.com \
         --geonodepwd gn_password \
         --geoserverpwd gs_password \
+        --mapstorepwd ms_password \
+        --mapstoregeoserverpwd ms_geoserver_read_password \
         --pgpwd pg_password \
         --dbpwd db_password \
         --geodbpwd _db_password \
@@ -77,6 +195,8 @@ To setup your project follow these instructions:
         "email": "value",
         "geonodepwd": "value",
         "geoserverpwd": "value",
+        "mapstorepwd": "value",
+        "mapstoregeoserverpwd": "value",
         "pgpwd": "value",
         "dbpwd": "value",
         "geodbpwd": "value",
@@ -104,6 +224,14 @@ Once you have the project configured run the following command from the root fol
     before running `docker-compose up`
 
 2. Access the site on http://localhost/
+
+The `geoserver-init` service creates or verifies the account configured by
+`GEOSERVER_ADMIN_USER` and grants it the `ADMIN` and `GROUP_ADMIN` roles. On a
+fresh stock GeoServer data directory, the bootstrap credentials are `admin` /
+`geoserver`. If you change them, they must match the account in your seeded
+GeoServer data directory. The initializer does not delete the bootstrap
+account; production deployments should use secured seed data and disable or
+rotate that account after validating the configured administrator.
 
 ## Run the instance on a public site
 

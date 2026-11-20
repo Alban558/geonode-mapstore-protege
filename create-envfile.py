@@ -175,6 +175,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--geonodepwd", help="GeoNode admin password")
     parser.add_argument("--geoserverpwd", help="Geoserver admin password")
+    parser.add_argument("--mapstorepwd", help="Standalone MapStore admin password")
+    parser.add_argument("--mapstoregeoserverpwd", help="Standalone MapStore GeoServer reader password")
     parser.add_argument("--pgpwd", help="PostgreSQL password")
     parser.add_argument("--dbpwd", help="GeoNode DB user password")
     parser.add_argument("--geodbpwd", help="Geodatabase user password")
