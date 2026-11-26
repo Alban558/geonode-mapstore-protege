@@ -106,14 +106,16 @@ requêtes anonymes.
 Dans le catalogue de MapStore, ajouter un service WMS avec l’adresse :
 
 ```text
-http://localhost:8081/geoserver/wms
+http://mapstore-gateway/geoserver/wms
 ```
 
-Le gateway GeoServer exige une authentification HTTP Basic. Utiliser
-`MAPSTORE_GEOSERVER_READER_USER` et
-`MAPSTORE_GEOSERVER_READER_PASSWORD` de `.env`; ces identifiants sont distincts
-de ceux de MapStore et de GeoNode. Le comportement du dialogue d’authentification
-dans l’interface MapStore reste à confirmer.
+Cette adresse interne est nécessaire car MapStore vérifie le catalogue via son
+proxy côté serveur. Dans le formulaire, cliquer sur l’icône d’identifiants à
+côté de l’URL, puis entrer `MAPSTORE_GEOSERVER_READER_USER` et
+`MAPSTORE_GEOSERVER_READER_PASSWORD` de `.env`. Le gateway GeoServer exige
+Basic Auth; ces identifiants sont distincts de ceux de MapStore et GeoNode.
+`docker/mapstore/proxy.properties` limite le proxy MapStore au seul gateway
+GeoServer interne.
 
 Les tests HTTP confirment que les requêtes WMS anonymes sont refusées et que le
 compte lecteur peut obtenir les capacités et une image `GetMap`. La validation

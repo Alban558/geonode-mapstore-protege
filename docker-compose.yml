@@ -152,6 +152,7 @@ services:
       INITIAL_ADMIN_PASSWORD: ${MAPSTORE_INITIAL_ADMIN_PASSWORD:-}
     volumes:
       - mapstore-data:/usr/local/tomcat/datadir
+      - ./docker/mapstore/proxy.properties:/usr/local/tomcat/datadir/proxy.properties:ro
     restart: unless-stopped
 
   # Same-origin gateway for MapStore and GeoServer WMS requests.
