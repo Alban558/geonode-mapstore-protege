@@ -118,6 +118,27 @@ else
     fi
 fi
 
+reader_gwc_rules="$(curl --silent --show-error --fail \
+    --user "${GEOSERVER_ADMIN_USER}:${GEOSERVER_ADMIN_PASSWORD}" \
+    -H 'Accept: application/xml' \
+    "${GEOFENCE_RULES_URL}/?roleName=${READER_ROLE}&workspace=${READER_WORKSPACE}&layer=${READER_LAYER}&service=GWC")"
+if printf '%s' "${reader_gwc_rules}" | grep -Fq "<roleName>${READER_ROLE}</roleName>"; then
+    if ! printf '%s' "${reader_gwc_rules}" | grep -Fq '<access>ALLOW</access>'; then
+        echo "An existing GeoFence rule for ${READER_ROLE} denies GWC access to ${READER_WORKSPACE}:${READER_LAYER}" >&2
+        exit 1
+    fi
+else
+    reader_gwc_rule="<Rule><access>ALLOW</access><priority>0</priority><roleName>${READER_ROLE}</roleName><workspace>${READER_WORKSPACE}</workspace><layer>${READER_LAYER}</layer><service>GWC</service></Rule>"
+    gwc_rule_status="$(printf '%s' "${reader_gwc_rule}" | curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+        --user "${GEOSERVER_ADMIN_USER}:${GEOSERVER_ADMIN_PASSWORD}" \
+        -H 'Content-Type: application/xml' -X POST --data-binary @- \
+        "${GEOFENCE_RULES_URL}/")"
+    if [[ "${gwc_rule_status}" != "201" ]]; then
+        echo "Creating the GeoFence GWC rule for ${READER_ROLE} failed (HTTP ${gwc_rule_status})" >&2
+        exit 1
+    fi
+fi
+
 anonymous_geofence_rules="$(curl --silent --show-error --fail \
     --user "${GEOSERVER_ADMIN_USER}:${GEOSERVER_ADMIN_PASSWORD}" \
     -H 'Accept: application/xml' \
@@ -156,6 +177,14 @@ reader_map_type="$(curl --silent --show-error --output /dev/null --write-out '%{
     --user "${MAPSTORE_GEOSERVER_READER_USER}:${MAPSTORE_GEOSERVER_READER_PASSWORD}" "${map_url}")"
 if [[ "${reader_map_type}" != "image/png" ]]; then
     echo "GeoServer reader GetMap returned ${reader_map_type}, expected image/png" >&2
+    exit 1
+fi
+
+reader_gwc_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+    --user "${MAPSTORE_GEOSERVER_READER_USER}:${MAPSTORE_GEOSERVER_READER_PASSWORD}" \
+    "${GEOSERVER_URL}/gwc/service/wmts?service=WMTS&REQUEST=DescribeDomains&version=1.0.0&layer=${layer_name}&tileMatrixSet=EPSG:4326&expandLimit=10")"
+if [[ "${reader_gwc_status}" != "200" ]]; then
+    echo "GeoServer reader WMTS DescribeDomains returned HTTP ${reader_gwc_status}, expected 200" >&2
     exit 1
 fi
 

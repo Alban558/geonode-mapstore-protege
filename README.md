@@ -98,8 +98,9 @@ docker compose up -d --force-recreate mapstore-reader-init
 ```
 
 Le rôle `MAPSTORE_READ` et le compte lecteur GeoServer sont créés par
-l’initialiseur. Les règles GeoFence maintiennent la couche inaccessible aux
-requêtes anonymes.
+l’initialiseur. Les règles GeoFence autorisent WMS et les requêtes GeoWebCache
+(GWC) WMTS nécessaires au lecteur, tout en maintenant la couche inaccessible
+aux requêtes anonymes.
 
 ### 5. Ajouter le catalogue WMS à MapStore
 
